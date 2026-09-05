@@ -1,0 +1,37 @@
+import { Router } from "express";
+import {
+  validateBody,
+  validateParams,
+  validateQuery,
+} from "../../middlewares/validate.middleware.js";
+
+import {
+  addProduct,
+  getAllProducts,
+  getOneProduct,
+  editProduct,
+  removeProduct,
+} from "./product.controller.js";
+
+import {
+  createProductSchema,
+  productIdParamsSchema,
+  updateProductSchema,
+  productListQuerySchema,
+} from "./product.schema.js";
+
+const router = Router();
+
+router.get("/", validateQuery(productListQuerySchema), getAllProducts);
+router.get("/:id", validateParams(productIdParamsSchema), getOneProduct);
+
+router.post("/", validateBody(createProductSchema), addProduct);
+router.patch(
+  "/:id",
+  validateParams(productIdParamsSchema),
+  validateBody(updateProductSchema),
+  editProduct,
+);
+router.delete("/:id", validateParams(productIdParamsSchema), removeProduct);
+
+export default router;
