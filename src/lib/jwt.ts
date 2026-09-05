@@ -10,7 +10,7 @@ if (!JWT_ACCESS_SECRET) {
   throw new Error("JWT_ACCESS_SECRET is not defined");
 }
 
-export const signAccessToken = (userId: string) => {
+export const signAccessToken = (userId: number) => {
   return jwt.sign({}, JWT_ACCESS_SECRET, {
     algorithm: "HS256",
     subject: String(userId),

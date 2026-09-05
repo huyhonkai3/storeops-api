@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 
 import { Prisma } from "../generated/prisma/client.js";
 import { AppError } from "../errors/app-error.js";
+import jwt from "jsonwebtoken";
 
 export const errorHandler = (
   error: unknown,
@@ -35,6 +36,26 @@ export const errorHandler = (
       });
       return;
     }
+  }
+
+  if (error instanceof jwt.TokenExpiredError) {
+    res.status(401).json({
+      error: {
+        code: "TOKEN_EXPIRED",
+        message: "Access token has expired",
+      },
+    });
+    return;
+  }
+
+  if (error instanceof jwt.JsonWebTokenError) {
+    res.status(401).json({
+      error: {
+        code: "INVALID_TOKEN",
+        message: "Invalid access token",
+      },
+    });
+    return;
   }
 
   console.error(error);
