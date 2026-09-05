@@ -1,4 +1,8 @@
 import { Router } from "express";
+
+import { authenticate } from "../../middlewares/auth.middleware.js";
+import { authorize } from "../../middlewares/authorize.middleware.js";
+
 import {
   validateBody,
   validateParams,
@@ -22,16 +26,32 @@ import {
 
 const router = Router();
 
+// Tất cả Product API yêu cầu đăng nhập.
+router.use(authenticate);
+
+// USER và ADMIN đều được đọc Product.
 router.get("/", validateQuery(productListQuerySchema), getAllProducts);
 router.get("/:id", validateParams(productIdParamsSchema), getOneProduct);
 
-router.post("/", validateBody(createProductSchema), addProduct);
+// Chỉ ADMIN được thay đổi Product.
+router.post(
+  "/",
+  authorize("ADMIN"),
+  validateBody(createProductSchema),
+  addProduct,
+);
 router.patch(
   "/:id",
+  authorize("ADMIN"),
   validateParams(productIdParamsSchema),
   validateBody(updateProductSchema),
   editProduct,
 );
-router.delete("/:id", validateParams(productIdParamsSchema), removeProduct);
+router.delete(
+  "/:id",
+  authorize("ADMIN"),
+  validateParams(productIdParamsSchema),
+  removeProduct,
+);
 
 export default router;
