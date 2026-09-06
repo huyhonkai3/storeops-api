@@ -2,9 +2,20 @@ import bcrypt from "bcryptjs";
 
 import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../lib/prisma.js";
-import { signAccessToken } from "../../lib/jwt.js";
+import {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+  REFRESH_TOKEN_TTL_SECONDS,
+  verifyAccessToken,
+} from "../../lib/jwt.js";
+import { hashToken } from "../../lib/token.js";
 
-import type { RegisterInput, LoginInput } from "./auth.types.js";
+import type {
+  RegisterInput,
+  LoginInput,
+  RefreshTokenInput,
+} from "./auth.types.js";
 
 const SALT_ROUNDS = 10;
 
@@ -61,9 +72,19 @@ export const login = async (input: LoginInput) => {
   }
 
   const accessToken = signAccessToken(user.id);
+  const refreshToken = signRefreshToken(user.id);
+
+  await prisma.refreshToken.create({
+    data: {
+      userId: user.id,
+      tokenHash: hashToken(refreshToken),
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000),
+    },
+  });
 
   return {
     accessToken,
+    refreshToken,
     user: {
       id: user.id,
       name: user.name,
@@ -83,6 +104,72 @@ export const getAuthUserById = async (id: number) => {
       name: true,
       email: true,
       role: true,
+    },
+  });
+};
+
+export const refreshAccessToken = async (input: RefreshTokenInput) => {
+  const userId = verifyRefreshToken(input.refreshToken);
+  const tokenHash = hashToken(input.refreshToken);
+
+  const storedToken = await prisma.refreshToken.findUnique({
+    where: {
+      tokenHash,
+    },
+  });
+
+  if (!storedToken) {
+    throw new AppError(401, "INVALID_REFRESH_TOKEN", "Invalid refresh token");
+  }
+
+  if (storedToken.revokedAt) {
+    throw new AppError(
+      401,
+      "REFRESH_TOKEN_REVOKED",
+      "Refresh token has been revoked",
+    );
+  }
+
+  if (storedToken.expiresAt <= new Date()) {
+    throw new AppError(
+      401,
+      "REFRESH_TOKEN_EXPIRED",
+      "Refresh token has expired",
+    );
+  }
+
+  if (storedToken.userId !== userId) {
+    throw new AppError(401, "INVALID_REFRESH_TOKEN", "Invalid refresh token");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!user) {
+    throw new AppError(401, "INVALID_REFRESH_TOKEN", "Invalid refresh token");
+  }
+
+  const accessToken = signAccessToken(user.id);
+
+  return { accessToken };
+};
+
+export const logout = async (input: RefreshTokenInput): Promise<void> => {
+  const tokenHash = hashToken(input.refreshToken);
+
+  await prisma.refreshToken.updateMany({
+    where: {
+      tokenHash,
+      revokedAt: null,
+    },
+    data: {
+      revokedAt: new Date(),
     },
   });
 };

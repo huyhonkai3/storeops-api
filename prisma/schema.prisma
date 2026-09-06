@@ -20,6 +20,21 @@ model User {
   role UserRole @default(USER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id Int @id @default(autoincrement())
+  tokenHash String @unique
+  userId Int
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Product {
@@ -28,6 +43,15 @@ model Product {
   sku String @unique
   price Int
   stock Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Store {
+  id Int @id @default(autoincrement())
+  name String
+  code String @unique
+  address String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
