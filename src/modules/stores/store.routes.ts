@@ -16,18 +16,20 @@ import {
 } from "./store.schema.js";
 import {
   validateBody,
+  validateParams,
   validateQuery,
 } from "../../middlewares/validate.middleware.js";
+import { validate } from "zod/v4/core";
 
 const router = Router();
 
 router.use(authenticate);
 
 router.get("/", validateQuery(storeListQuerySchema), getAllStores);
-router.get("/:id", validateQuery(storeIdParamsSchema), getOneStore);
+router.get("/:id", validateParams(storeIdParamsSchema), getOneStore);
 
 router.post("/", authorize("ADMIN"), validateBody(createStoreSchema), addStore);
-router.put(
+router.patch(
   "/:id",
   authorize("ADMIN"),
   validateBody(updateStoreSchema),
@@ -36,7 +38,7 @@ router.put(
 router.delete(
   "/:id",
   authorize("ADMIN"),
-  validateBody(storeIdParamsSchema),
+  validateParams(storeIdParamsSchema),
   removeStore,
 );
 
