@@ -6,6 +6,7 @@ import { notFoundHandler } from "./middlewares/not-found.middleware.js";
 import productRoutes from "./modules/products/product.routes.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import storeRoutes from "./modules/stores/store.routes.js";
+import storeMemberRoutes from "./modules/store-members/store-member.routes.js";
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/products", productRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/stores", storeRoutes);
+app.use("/api/store", storeMemberRoutes);
 
 // Không route match
 app.use(notFoundHandler);
