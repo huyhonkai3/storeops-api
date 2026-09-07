@@ -3,9 +3,13 @@ import {
   addStoreMember,
   getStoreMembers,
   removeStoreMember,
+  updateStoreMemberRole,
 } from "../store-members/store-member.service.js";
 
-import { AddStoreMemberInput } from "./store-member.type.js";
+import {
+  AddStoreMemberInput,
+  UpdateStoreMemberRoleInput,
+} from "./store-member.type.js";
 import { endsWith } from "zod";
 
 export const addMember = async (
@@ -34,4 +38,18 @@ export const removeMember = async (
   const userId = Number(req.params.userId);
   await removeStoreMember(storeId, userId);
   res.status(204).end();
+};
+
+export const editMemberRole = async (
+  req: Request<
+    { storeId: string; userId: string },
+    {},
+    UpdateStoreMemberRoleInput
+  >,
+  res: Response,
+): Promise<void> => {
+  const storeId = Number(req.params.storeId);
+  const userId = Number(req.params.userId);
+  const member = await updateStoreMemberRole(storeId, userId, req.body);
+  res.status(200).json(member);
 };

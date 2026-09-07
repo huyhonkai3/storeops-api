@@ -1,7 +1,10 @@
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../errors/app-error.js";
 
-import type { AddStoreMemberInput } from "./store-member.type.js";
+import type {
+  AddStoreMemberInput,
+  UpdateStoreMemberRoleInput,
+} from "./store-member.type.js";
 
 export const addStoreMember = async (
   storeId: number,
@@ -45,6 +48,7 @@ export const addStoreMember = async (
     data: {
       userId: input.userId,
       storeId,
+      role: input.role,
     },
     include: {
       user: {
@@ -52,7 +56,6 @@ export const addStoreMember = async (
           id: true,
           name: true,
           email: true,
-          role: true,
         },
       },
     },
@@ -60,7 +63,7 @@ export const addStoreMember = async (
 };
 
 export const getStoreMembers = async (storeId: number) => {
-  const store = await prisma.storeMember.findUnique({
+  const store = await prisma.store.findUnique({
     where: {
       id: storeId,
     },
@@ -99,7 +102,11 @@ export const removeStoreMember = async (storeId: number, userId: number) => {
     },
   });
   if (!membership) {
-    throw new AppError(404, "STORE_MEMBER_NOT_FOUND", "Store member not found");
+    throw new AppError(
+      409,
+      "STORE_MEMBER_ALREADY_EXISTS",
+      "User is already a member of this store",
+    );
   }
 
   return prisma.storeMember.delete({
@@ -108,6 +115,37 @@ export const removeStoreMember = async (storeId: number, userId: number) => {
         userId,
         storeId,
       },
+    },
+  });
+};
+
+export const updateStoreMemberRole = async (
+  storeId: number,
+  userId: number,
+  input: UpdateStoreMemberRoleInput,
+) => {
+  const membership = await prisma.storeMember.findUnique({
+    where: {
+      userId_storeId: {
+        storeId,
+        userId,
+      },
+    },
+  });
+
+  if (!membership) {
+    throw new AppError(404, "STORE_MEMBER_NOT_FOUND", "Store member not found");
+  }
+
+  return prisma.storeMember.update({
+    where: {
+      userId_storeId: {
+        userId,
+        storeId,
+      },
+    },
+    data: {
+      role: input.role,
     },
   });
 };

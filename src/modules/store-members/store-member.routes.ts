@@ -2,6 +2,7 @@ import { Router } from "express";
 import { authenticate } from "../../middlewares/auth.middleware.js";
 import { authorize } from "../../middlewares/authorize.middleware.js";
 import { requireStoreMember } from "../../middlewares/store-member.middleware.js";
+import { requireStoreRole } from "../../middlewares/store-role.middleware.js";
 
 import {
   validateBody,
@@ -12,12 +13,14 @@ import {
   addStoreMemberSchema,
   storeIdParamsSchema,
   storeMemberParamsSchema,
+  updateStoreMemberRoleSchema,
 } from "./store-member.schema.js";
 
 import {
   addMember,
   getMembers,
   removeMember,
+  editMemberRole,
 } from "./store-member.controller.js";
 
 const router = Router();
@@ -26,8 +29,8 @@ router.use(authenticate);
 
 router.post(
   "/:storeId/members",
-  authorize("ADMIN"),
   validateParams(storeIdParamsSchema),
+  requireStoreRole("MANAGER"),
   validateBody(addStoreMemberSchema),
   addMember,
 );
@@ -39,10 +42,18 @@ router.get(
   getMembers,
 );
 
+router.patch(
+  "/:storeId/members/:userId/role",
+  validateParams(storeMemberParamsSchema),
+  requireStoreRole("MANAGER"),
+  validateBody(updateStoreMemberRoleSchema),
+  editMemberRole,
+);
+
 router.delete(
   "/:storeId/members/:userId",
-  authorize("ADMIN"),
   validateParams(storeMemberParamsSchema),
+  requireStoreRole("MANAGER"),
   removeMember,
 );
 

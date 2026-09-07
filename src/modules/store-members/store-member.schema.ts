@@ -6,6 +6,7 @@ export const addStoreMemberSchema = z
       .number()
       .int("User ID must be an integer")
       .positive("User Id must be a positive integer"),
+    role: z.enum(["MANAGER", "STAFF"]).default("STAFF"),
   })
   .strict();
 
@@ -21,3 +22,9 @@ export const storeMemberParamsSchema = z.object({
     .regex(/^[1-9]\d*$/, "Store ID must be a positive integer"),
   userId: z.string().regex(/^[1-9]\d*$/, "User ID must be a positive integer"),
 });
+
+export const updateStoreMemberRoleSchema = z
+  .object({
+    role: z.enum(["MANAGER", "STAFF"]),
+  })
+  .strict();

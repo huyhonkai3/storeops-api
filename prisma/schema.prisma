@@ -64,6 +64,7 @@ model StoreMember {
   id Int @id @default(autoincrement())
   userId Int
   storeId Int
+  role StoreMemberRole @default(STAFF)
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -71,4 +72,9 @@ model StoreMember {
 
   @@unique([userId, storeId])
   @@index([storeId])
+}
+
+enum StoreMemberRole {
+  MANAGER
+  STAFF
 }
