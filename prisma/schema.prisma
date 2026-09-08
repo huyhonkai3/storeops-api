@@ -12,6 +12,16 @@ enum UserRole {
   ADMIN
 }
 
+enum StoreMemberRole {
+  MANAGER
+  STAFF
+}
+
+enum InventoryMovementType {
+  STOCK_IN
+  STOCK_OUT
+}
+
 model User {
   id Int @id @default(autoincrement())
   name String
@@ -23,6 +33,7 @@ model User {
 
   refreshTokens RefreshToken[]
   storeMemberships StoreMember[]
+  inventoryMovements InventoryMovement[]
 }
 
 model RefreshToken {
@@ -47,13 +58,14 @@ model Product {
   updatedAt DateTime @updatedAt
 
   inventories Inventory[]
+  inventoryMovements InventoryMovement[]
 }
 
 model Inventory {
   id Int @id @default(autoincrement())
   storeId Int
   productId Int
-  quantity Int
+  quantity Int @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -74,6 +86,7 @@ model Store {
 
   members StoreMember[]
   inventories Inventory[]
+  inventoryMovements InventoryMovement[]
 }
 
 model StoreMember {
@@ -90,7 +103,21 @@ model StoreMember {
   @@index([storeId])
 }
 
-enum StoreMemberRole {
-  MANAGER
-  STAFF
+model InventoryMovement {
+  id Int @id @default(autoincrement())
+  storeId Int
+  productId Int
+  userId Int
+  quantity Int
+  note String?
+  type InventoryMovementType
+  createdAt DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt])
+  @@index([productId, createdAt])
+  @@index([userId])
 }

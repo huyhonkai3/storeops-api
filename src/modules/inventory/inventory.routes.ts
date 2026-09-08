@@ -2,13 +2,23 @@ import { Router } from "express";
 import { authenticate } from "../../middlewares/auth.middleware.js";
 import { requireStoreMember } from "../../middlewares/store-member.middleware.js";
 
-import { validateParams } from "../../middlewares/validate.middleware.js";
+import {
+  validateBody,
+  validateParams,
+} from "../../middlewares/validate.middleware.js";
 import {
   storeInventoryParamsSchema,
   inventoryItemParamsSchema,
+  stockMovementSchema,
 } from "./inventory.schema.js";
 
-import { getInventory, getOneInventoryItem } from "./inventory.controller.js";
+import {
+  getInventory,
+  getOneInventoryItem,
+  addStock,
+  removeStock,
+} from "./inventory.controller.js";
+import { requireStoreRole } from "../../middlewares/store-role.middleware.js";
 
 const router = Router();
 router.use(authenticate);
@@ -18,6 +28,21 @@ router.get(
   validateParams(storeInventoryParamsSchema),
   requireStoreMember,
   getInventory,
+);
+
+router.post(
+  "/:storeId/inventory/stock-in",
+  validateParams(storeInventoryParamsSchema),
+  requireStoreRole("MANAGER", "STAFF"),
+  validateBody(stockMovementSchema),
+  addStock,
+);
+router.post(
+  "/:storeId/inventory/stock-out",
+  validateParams(storeInventoryParamsSchema),
+  requireStoreRole("MANAGER", "STAFF"),
+  validateBody(stockMovementSchema),
+  removeStock,
 );
 
 router.get(
