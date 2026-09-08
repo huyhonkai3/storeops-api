@@ -7,6 +7,7 @@ import productRoutes from "./modules/products/product.routes.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import storeRoutes from "./modules/stores/store.routes.js";
 import storeMemberRoutes from "./modules/store-members/store-member.routes.js";
+import inventoryRoutes from "./modules/inventory/inventory.routes.js";
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/stores", storeRoutes);
 app.use("/api/store", storeMemberRoutes);
+app.use("/api/stores", inventoryRoutes);
 
 // Không route match
 app.use(notFoundHandler);

@@ -8,16 +8,7 @@ import type {
 } from "./product.types.js";
 
 export const getProducts = async (query: ProductListQuery) => {
-  const {
-    page,
-    limit,
-    search,
-    minPrice,
-    maxPrice,
-    minStock,
-    sortBy,
-    sortOrder,
-  } = query;
+  const { page, limit, search, minPrice, maxPrice, sortBy, sortOrder } = query;
   const skip = (page - 1) * limit;
   const where: Prisma.ProductWhereInput = {
     ...(search && {
@@ -51,11 +42,6 @@ export const getProducts = async (query: ProductListQuery) => {
           },
         }
       : {}),
-    ...(minStock !== undefined && {
-      stock: {
-        gte: minStock,
-      },
-    }),
   };
 
   const orderBy: Prisma.ProductOrderByWithRelationInput =
@@ -63,9 +49,7 @@ export const getProducts = async (query: ProductListQuery) => {
       ? { name: sortOrder }
       : sortBy === "price"
         ? { price: sortOrder }
-        : sortBy === "stock"
-          ? { stock: sortOrder }
-          : { createdAt: sortOrder };
+        : { createdAt: sortOrder };
 
   const [products, total] = await Promise.all([
     prisma.product.findMany({
@@ -105,7 +89,6 @@ export const createProduct = async (input: CreateProductInput) => {
       name: input.name,
       sku: input.sku,
       price: input.price,
-      stock: input.stock,
     },
   });
 };

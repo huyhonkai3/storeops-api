@@ -18,11 +18,6 @@ export const createProductSchema = z
       .number()
       .int("Price must be an integer")
       .positive("Price must be greater than 0"),
-
-    stock: z
-      .number()
-      .int("Stock must be an integer")
-      .nonnegative("Stock cannot be negative"),
   })
   .strict();
 
@@ -57,10 +52,7 @@ export const productListQuerySchema = z
       .optional(),
     minPrice: z.coerce.number().int().nonnegative().optional(),
     maxPrice: z.coerce.number().int().nonnegative().optional(),
-    minStock: z.coerce.number().int().nonnegative().optional(),
-    sortBy: z
-      .enum(["name", "price", "stock", "createdAt"])
-      .default("createdAt"),
+    sortBy: z.enum(["name", "price", "createdAt"]).default("createdAt"),
     sortOrder: z.enum(["asc", "desc"]).default("desc"),
   })
   .strict()

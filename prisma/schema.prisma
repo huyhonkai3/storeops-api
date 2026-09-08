@@ -43,9 +43,25 @@ model Product {
   name String
   sku String @unique
   price Int
-  stock Int @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  inventories Inventory[]
+}
+
+model Inventory {
+  id Int @id @default(autoincrement())
+  storeId Int
+  productId Int
+  quantity Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, productId])
+  @@index([productId])
 }
 
 model Store {
@@ -57,8 +73,8 @@ model Store {
   updatedAt DateTime @updatedAt
 
   members StoreMember[]
+  inventories Inventory[]
 }
-
 
 model StoreMember {
   id Int @id @default(autoincrement())
