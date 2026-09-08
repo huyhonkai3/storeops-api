@@ -1,7 +1,10 @@
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../errors/app-error.js";
-import { StockMovementInput } from "./inventory.types.js";
-import { productIdParamsSchema } from "../products/product.schema.js";
+import {
+  StockMovementInput,
+  InventoryHistoryQueryInput,
+} from "./inventory.types.js";
+import type { Prisma } from "../../generated/prisma/client.js";
 
 // Lấy tồn kho của 1 cửa hàng
 export const getStoreInventory = async (storeId: number) => {
@@ -77,7 +80,7 @@ export const stockIn = async (
   userId: number,
 ) => {
   return prisma.$transaction(async (tx) => {
-    const store = prisma.store.findUnique({
+    const store = await prisma.store.findUnique({
       where: {
         id: storeId,
       },
@@ -86,7 +89,7 @@ export const stockIn = async (
       throw new AppError(404, "STORE_NOT_FOUND", "Store not found");
     }
 
-    const product = prisma.product.findUnique({
+    const product = await tx.product.findUnique({
       where: {
         id: input.productId,
       },
@@ -95,7 +98,7 @@ export const stockIn = async (
       throw new AppError(404, "PRODUCT_NOT_FOUND", "Product not found");
     }
 
-    const inventory = await prisma.inventory.upsert({
+    const inventory = await tx.inventory.upsert({
       where: {
         storeId_productId: {
           storeId,
@@ -138,7 +141,7 @@ export const stockOut = async (
   userId: number,
 ) => {
   return prisma.$transaction(async (tx) => {
-    const store = await prisma.store.findUnique({
+    const store = await tx.store.findUnique({
       where: {
         id: storeId,
       },
@@ -147,7 +150,7 @@ export const stockOut = async (
       throw new AppError(404, "STORE_NOT_FOUND", "Store not found");
     }
 
-    const product = await prisma.product.findUnique({
+    const product = await tx.product.findUnique({
       where: {
         id: input.productId,
       },
@@ -184,7 +187,7 @@ export const stockOut = async (
     });
 
     if (updated.count === 0) {
-      throw new AppError(400, "INSUFFICIENT_STOCK", "Insufficient stock");
+      throw new AppError(409, "INSUFFICIENT_STOCK", "Insufficient stock");
     }
 
     const updateInventory = await tx.inventory.findUnique({
@@ -209,4 +212,100 @@ export const stockOut = async (
       movement,
     };
   });
+};
+
+export const getInventoryHistory = async (
+  storeId: number,
+  query: InventoryHistoryQueryInput,
+) => {
+  const { page, limit, type, productId, userId, from, to } = query;
+  const store = prisma.store.findUnique({
+    where: {
+      id: storeId,
+    },
+  });
+  if (!store) {
+    throw new AppError(404, "STORE_NOT_FOUND", "Store not found");
+  }
+
+  const skip = (page - 1) * limit;
+  const where: Prisma.InventoryMovementWhereInput = {
+    storeId,
+
+    ...(type && {
+      type,
+    }),
+
+    ...(productId !== undefined && {
+      productId,
+    }),
+
+    ...(userId !== undefined && {
+      userId,
+    }),
+
+    ...(from || to
+      ? {
+          createdAt: {
+            ...(from && {
+              gte: from,
+            }),
+            ...(to && {
+              lte: to,
+            }),
+          },
+        }
+      : {}),
+  };
+
+  const [movements, total] = await Promise.all([
+    prisma.inventoryMovement.findMany({
+      where,
+
+      skip,
+      take: limit,
+
+      orderBy: {
+        createdAt: "desc",
+      },
+
+      select: {
+        id: true,
+        type: true,
+        quantity: true,
+        note: true,
+        createdAt: true,
+
+        product: {
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+          },
+        },
+
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    }),
+
+    prisma.inventoryMovement.count({
+      where,
+    }),
+  ]);
+
+  return {
+    data: movements,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
 };

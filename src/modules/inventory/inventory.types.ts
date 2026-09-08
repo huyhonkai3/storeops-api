@@ -1,4 +1,10 @@
 import { z } from "zod";
-import { stockMovementSchema } from "./inventory.schema.js";
+import {
+  stockMovementSchema,
+  inventoryHistoryQuerySchema,
+} from "./inventory.schema.js";
 
 export type StockMovementInput = z.infer<typeof stockMovementSchema>;
+export type InventoryHistoryQueryInput = z.infer<
+  typeof inventoryHistoryQuerySchema
+>;

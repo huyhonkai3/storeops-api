@@ -5,11 +5,13 @@ import { requireStoreMember } from "../../middlewares/store-member.middleware.js
 import {
   validateBody,
   validateParams,
+  validateQuery,
 } from "../../middlewares/validate.middleware.js";
 import {
   storeInventoryParamsSchema,
   inventoryItemParamsSchema,
   stockMovementSchema,
+  inventoryHistoryQuerySchema,
 } from "./inventory.schema.js";
 
 import {
@@ -17,6 +19,7 @@ import {
   getOneInventoryItem,
   addStock,
   removeStock,
+  getHistory,
 } from "./inventory.controller.js";
 import { requireStoreRole } from "../../middlewares/store-role.middleware.js";
 
@@ -43,6 +46,14 @@ router.post(
   requireStoreRole("MANAGER", "STAFF"),
   validateBody(stockMovementSchema),
   removeStock,
+);
+
+router.get(
+  "/:storeId/inventory/history",
+  validateParams(storeInventoryParamsSchema),
+  requireStoreMember,
+  validateQuery(inventoryHistoryQuerySchema),
+  getHistory,
 );
 
 router.get(

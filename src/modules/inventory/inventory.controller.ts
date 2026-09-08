@@ -5,8 +5,12 @@ import {
   getStoreInventory,
   stockIn,
   stockOut,
+  getInventoryHistory,
 } from "./inventory.service.js";
-import { StockMovementInput } from "./inventory.types.js";
+import {
+  StockMovementInput,
+  InventoryHistoryQueryInput,
+} from "./inventory.types.js";
 
 export const getInventory = async (
   req: Request<{ storeId: string }>,
@@ -67,4 +71,14 @@ export const removeStock = async (
   res.status(200).json({
     data: result,
   });
+};
+
+export const getHistory = async (
+  req: Request<{ storeId: string }>,
+  res: Response,
+): Promise<void> => {
+  const storeId = Number(req.params.storeId);
+  const query = res.locals.validateQuery as InventoryHistoryQueryInput;
+  const history = await getInventoryHistory(storeId, query);
+  res.status(200).json(history);
 };

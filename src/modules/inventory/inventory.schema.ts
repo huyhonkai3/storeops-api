@@ -33,3 +33,21 @@ export const stockMovementSchema = z
       .optional(),
   })
   .strict();
+
+export const inventoryHistoryQuerySchema = z
+  .object({
+    page: z.coerce.number().int().positive().default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(10),
+    type: z.enum(["STOCK_IN", "STOCK_OUT"]).optional(),
+    productId: z.coerce.number().int().positive().optional(),
+    userId: z.coerce.number().int().positive().optional(),
+    from: z.coerce.date().optional(),
+    to: z.coerce.date().optional(),
+  })
+  .strict()
+  .refine((query) => {
+    return (
+      !query.from || !query.to || query.from <= query.to,
+      { message: "from cannot after to", path: ["from"] }
+    );
+  });
