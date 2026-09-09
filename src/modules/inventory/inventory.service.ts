@@ -80,7 +80,7 @@ export const stockIn = async (
   userId: number,
 ) => {
   return prisma.$transaction(async (tx) => {
-    const store = await prisma.store.findUnique({
+    const store = await tx.store.findUnique({
       where: {
         id: storeId,
       },
@@ -219,7 +219,7 @@ export const getInventoryHistory = async (
   query: InventoryHistoryQueryInput,
 ) => {
   const { page, limit, type, productId, userId, from, to } = query;
-  const store = prisma.store.findUnique({
+  const store = await prisma.store.findUnique({
     where: {
       id: storeId,
     },

@@ -87,6 +87,7 @@ model Store {
   members StoreMember[]
   inventories Inventory[]
   inventoryMovements InventoryMovement[]
+  customers Customer[]
 }
 
 model StoreMember {
@@ -120,4 +121,20 @@ model InventoryMovement {
   @@index([storeId, createdAt])
   @@index([productId, createdAt])
   @@index([userId])
+}
+
+model Customer {
+  id Int @id @default(autoincrement())
+  storeId Int
+  name String
+  phone String
+  email String?
+  address String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, phone])
+  @@index([storeId])
 }
