@@ -19,7 +19,7 @@ export const getAllCustomers = async (
   res: Response,
 ): Promise<void> => {
   const storeId = Number(req.params.storeId);
-  const query = res.locals.validateQuery as CustomerListQueryInput;
+  const query = res.locals.validatedQuery as CustomerListQueryInput;
   const result = await getCustomers(storeId, query);
   res.status(200).json(result);
 };

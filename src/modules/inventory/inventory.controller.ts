@@ -78,7 +78,7 @@ export const getHistory = async (
   res: Response,
 ): Promise<void> => {
   const storeId = Number(req.params.storeId);
-  const query = res.locals.validateQuery as InventoryHistoryQueryInput;
+  const query = res.locals.validatedQuery as InventoryHistoryQueryInput;
   const history = await getInventoryHistory(storeId, query);
   res.status(200).json(history);
 };

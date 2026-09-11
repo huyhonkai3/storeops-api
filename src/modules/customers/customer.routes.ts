@@ -2,7 +2,6 @@ import { Router } from "express";
 import { authenticate } from "../../middlewares/auth.middleware.js";
 import { requireStoreMember } from "../../middlewares/store-member.middleware.js";
 import { requireStoreRole } from "../../middlewares/store-role.middleware.js";
-import { getCustomers } from "./customer.service.js";
 
 import {
   validateBody,
@@ -56,8 +55,9 @@ router.post(
 
 router.patch(
   "/:storeId/customers/:customerId",
-  validateParams(updateCustomerSchema),
+  validateParams(customerParamsSchema),
   requireStoreRole("MANAGER", "STAFF"),
+  validateBody(updateCustomerSchema),
   editCustomer,
 );
 

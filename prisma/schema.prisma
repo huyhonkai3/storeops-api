@@ -22,27 +22,34 @@ enum InventoryMovementType {
   STOCK_OUT
 }
 
-model User {
-  id Int @id @default(autoincrement())
-  name String
-  email String @unique
-  passwordHash String
-  role UserRole @default(USER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
 
-  refreshTokens RefreshToken[]
-  storeMemberships StoreMember[]
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  refreshTokens      RefreshToken[]
+  storeMemberships   StoreMember[]
   inventoryMovements InventoryMovement[]
+  ordersCreated      Order[]
 }
 
 model RefreshToken {
-  id Int @id @default(autoincrement())
-  tokenHash String @unique
-  userId Int
+  id        Int       @id @default(autoincrement())
+  tokenHash String    @unique
+  userId    Int
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -50,26 +57,27 @@ model RefreshToken {
 }
 
 model Product {
-  id Int @id @default(autoincrement())
-  name String
-  sku String @unique
-  price Int
+  id        Int      @id @default(autoincrement())
+  name      String
+  sku       String   @unique
+  price     Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  inventories Inventory[]
+  inventories        Inventory[]
   inventoryMovements InventoryMovement[]
+  orderItems         OrderItem[]
 }
 
 model Inventory {
-  id Int @id @default(autoincrement())
-  storeId Int
+  id        Int      @id @default(autoincrement())
+  storeId   Int
   productId Int
-  quantity Int @default(0)
+  quantity  Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([storeId, productId])
@@ -77,27 +85,28 @@ model Inventory {
 }
 
 model Store {
-  id Int @id @default(autoincrement())
-  name String
-  code String @unique
-  address String?
+  id        Int      @id @default(autoincrement())
+  name      String
+  code      String   @unique
+  address   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members StoreMember[]
-  inventories Inventory[]
+  members            StoreMember[]
+  inventories        Inventory[]
   inventoryMovements InventoryMovement[]
-  customers Customer[]
+  customers          Customer[]
+  orders             Order[]
 }
 
 model StoreMember {
-  id Int @id @default(autoincrement())
-  userId Int
-  storeId Int
-  role StoreMemberRole @default(STAFF)
-  createdAt DateTime @default(now())
+  id        Int             @id @default(autoincrement())
+  userId    Int
+  storeId   Int
+  role      StoreMemberRole @default(STAFF)
+  createdAt DateTime        @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, storeId])
@@ -105,36 +114,84 @@ model StoreMember {
 }
 
 model InventoryMovement {
-  id Int @id @default(autoincrement())
-  storeId Int
+  id        Int                   @id @default(autoincrement())
+  storeId   Int
   productId Int
-  userId Int
-  quantity Int
-  note String?
-  type InventoryMovementType
-  createdAt DateTime @default(now())
+  userId    Int
+  orderId   Int?
+  quantity  Int
+  note      String?
+  type      InventoryMovementType
+  createdAt DateTime              @default(now())
 
-  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  order Order? @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([storeId, createdAt])
   @@index([productId, createdAt])
   @@index([userId])
+  @@index([orderId])
 }
 
 model Customer {
-  id Int @id @default(autoincrement())
-  storeId Int
-  name String
-  phone String
-  email String?
-  address String?
+  id        Int      @id @default(autoincrement())
+  storeId   Int
+  name      String
+  phone     String
+  email     String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store  Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@unique([storeId, phone])
+  @@index([storeId])
+}
+
+model Order {
+  id          Int @id @default(autoincrement())
+  storeId     Int
+  customerId  Int?
+  createdById Int
+
+  status OrderStatus @default(PENDING)
+
+  totalAmount Int
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
-  @@unique([storeId, phone])
-  @@index([storeId])
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  createdBy User @relation(fields: [createdById], references: [id])
+
+  items              OrderItem[]
+  inventoryMovements InventoryMovement[]
+
+  @@index([storeId, createdAt])
+  @@index([createdById])
+}
+
+model OrderItem {
+  id Int @id @default(autoincrement())
+
+  orderId   Int
+  productId Int
+
+  quantity  Int
+  unitPrice Int // giá tại lúc đặt hàng
+  lineTotal Int // unitPrice * quantity
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
 }

@@ -271,6 +271,7 @@ export const getInventoryHistory = async (
 
       select: {
         id: true,
+        orderId: true,
         type: true,
         quantity: true,
         note: true,
