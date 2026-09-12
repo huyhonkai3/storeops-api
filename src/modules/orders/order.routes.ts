@@ -17,9 +17,15 @@ import {
   orderListQuerySchema,
   orderParamsSchema,
   orderStoreParamsSchema,
+  cancelOrderSchema,
 } from "./order.schema.js";
 
-import { placeOrder, getAllOrders, getOneOrder } from "./order.controller.js";
+import {
+  placeOrder,
+  getAllOrders,
+  getOneOrder,
+  cancelOneOrder,
+} from "./order.controller.js";
 
 const router = Router();
 
@@ -46,6 +52,14 @@ router.post(
   requireStoreRole("MANAGER", "STAFF"),
   validateBody(createOrderSchema),
   placeOrder,
+);
+
+router.post(
+  "/:storeId/orders/:orderId/cancel",
+  validateParams(orderParamsSchema),
+  requireStoreRole("MANAGER"),
+  validateBody(cancelOrderSchema),
+  cancelOneOrder,
 );
 
 export default router;

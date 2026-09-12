@@ -3,7 +3,11 @@ import { AppError } from "../../errors/app-error.js";
 
 import type { Prisma } from "../../generated/prisma/client.js";
 
-import type { CreateOrderInput, OrderListQueryInput } from "./order.types.js";
+import type {
+  CreateOrderInput,
+  OrderListQueryInput,
+  CancelOrderInput,
+} from "./order.types.js";
 
 export const createOrder = async (
   storeId: number,
@@ -295,6 +299,7 @@ export const getOrders = async (
         status: true,
         totalAmount: true,
         createdAt: true,
+        cancelledAt: true,
 
         customer: {
           select: {
@@ -354,6 +359,14 @@ export const getOrderById = async (storeId: number, orderId: number) => {
         },
       },
 
+      cancelledBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+
       items: {
         include: {
           product: {
@@ -373,4 +386,178 @@ export const getOrderById = async (storeId: number, orderId: number) => {
   }
 
   return order;
+};
+
+export const cancelOrder = async (
+  storeId: number,
+  orderId: number,
+  input: CancelOrderInput,
+  userId: number,
+) => {
+  return prisma.$transaction(async (tx) => {
+    // 1. Lấy Order + items
+    const order = await tx.order.findFirst({
+      where: {
+        id: orderId,
+        storeId,
+      },
+
+      select: {
+        id: true,
+        status: true,
+
+        items: {
+          select: {
+            productId: true,
+            quantity: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new AppError(404, "ORDER_NOT_FOUND", "Order not found");
+    }
+
+    // 2. Check state để trả error rõ ràng
+    if (order.status === "CANCELLED") {
+      throw new AppError(
+        409,
+        "ORDER_ALREADY_CANCELLED",
+        "Order has already been cancelled",
+      );
+    }
+
+    if (order.status !== "CONFIRMED") {
+      throw new AppError(
+        409,
+        "ORDER_CANNOT_BE_CANCELLED",
+        "Only confirmed orders can be cancelled",
+      );
+    }
+
+    /*
+     * 3. Atomic state transition
+     *
+     * Đây là guard chống double cancellation.
+     */
+    const transition = await tx.order.updateMany({
+      where: {
+        id: orderId,
+        storeId,
+
+        // Quan trọng
+        status: "CONFIRMED",
+      },
+
+      data: {
+        status: "CANCELLED",
+
+        cancelledAt: new Date(),
+
+        cancelledById: userId,
+
+        cancelReason: input.reason ?? null,
+      },
+    });
+
+    /*
+     * Request khác có thể đã cancel Order
+     * ngay sau lúc chúng ta đọc Order.
+     */
+    if (transition.count === 0) {
+      throw new AppError(
+        409,
+        "ORDER_STATE_CHANGED",
+        "Order state has already changed",
+      );
+    }
+
+    // 4. Restore inventory
+    for (const item of order.items) {
+      await tx.inventory.upsert({
+        where: {
+          storeId_productId: {
+            storeId,
+            productId: item.productId,
+          },
+        },
+
+        create: {
+          storeId,
+          productId: item.productId,
+          quantity: item.quantity,
+        },
+
+        update: {
+          quantity: {
+            increment: item.quantity,
+          },
+        },
+      });
+    }
+
+    // 5. Audit Inventory History
+    await tx.inventoryMovement.createMany({
+      data: order.items.map((item) => ({
+        storeId,
+
+        productId: item.productId,
+
+        userId,
+
+        orderId,
+
+        type: "STOCK_IN",
+
+        quantity: item.quantity,
+
+        note: `Cancelled order #${orderId}`,
+      })),
+    });
+
+    // 6. Return updated order
+    return tx.order.findUnique({
+      where: {
+        id: orderId,
+      },
+
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          },
+        },
+
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+
+        cancelledBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  });
 };

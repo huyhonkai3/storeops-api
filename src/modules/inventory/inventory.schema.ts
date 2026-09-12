@@ -45,9 +45,7 @@ export const inventoryHistoryQuerySchema = z
     to: z.coerce.date().optional(),
   })
   .strict()
-  .refine((query) => {
-    return (
-      !query.from || !query.to || query.from <= query.to,
-      { message: "from cannot after to", path: ["from"] }
-    );
+  .refine((query) => !query.from || !query.to || query.from <= query.to, {
+    message: "from cannot be after to",
+    path: ["from"],
   });

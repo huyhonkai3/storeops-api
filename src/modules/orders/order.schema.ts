@@ -1,4 +1,3 @@
-import path from "path/win32";
 import { z } from "zod";
 
 export const orderStoreParamsSchema = z.object({
@@ -64,7 +63,18 @@ export const orderListQuerySchema = z
     to: z.coerce.date().optional(),
   })
   .strict()
-  .refine((query) => {
-    (!query.from || !query.to || query.from <= query.to,
-      { message: "from cannot be after to", path: ["from"] });
+  .refine((query) => !query.from || !query.to || query.from <= query.to, {
+    message: "from cannot be after to",
+    path: ["from"],
   });
+
+export const cancelOrderSchema = z
+  .object({
+    reason: z
+      .string()
+      .trim()
+      .min(3, "Cancel reason must be at least 3 characters")
+      .max(255, "Cancel reason must be at most 255 characters")
+      .optional(),
+  })
+  .strict();

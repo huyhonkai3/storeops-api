@@ -40,7 +40,8 @@ model User {
   refreshTokens      RefreshToken[]
   storeMemberships   StoreMember[]
   inventoryMovements InventoryMovement[]
-  ordersCreated      Order[]
+  ordersCreated      Order[]             @relation("OrderCreatedBy")
+  orderCancelled     Order[]             @relation("OrderCancelledBy")
 }
 
 model RefreshToken {
@@ -154,7 +155,7 @@ model Customer {
 }
 
 model Order {
-  id          Int @id @default(autoincrement())
+  id          Int  @id @default(autoincrement())
   storeId     Int
   customerId  Int?
   createdById Int
@@ -163,6 +164,10 @@ model Order {
 
   totalAmount Int
 
+  cancelledAt   DateTime?
+  cancelledById Int?
+  cancelReason  String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -170,13 +175,15 @@ model Order {
 
   customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
-  createdBy User @relation(fields: [createdById], references: [id])
+  createdBy   User  @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  cancelledBy User? @relation("OrderCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
 
   items              OrderItem[]
   inventoryMovements InventoryMovement[]
 
   @@index([storeId, createdAt])
   @@index([createdById])
+  @@index([cancelledById])
 }
 
 model OrderItem {
