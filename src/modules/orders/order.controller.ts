@@ -4,6 +4,7 @@ import { AppError } from "../../errors/app-error.js";
 
 import {
   createOrder,
+  confirmOrder,
   getOrders,
   getOrderById,
   cancelOrder,
@@ -32,6 +33,26 @@ export const placeOrder = async (
   const order = await createOrder(storeId, req.body, req.user.id);
 
   res.status(201).json({
+    data: order,
+  });
+};
+
+export const confirmOneOrder = async (
+  req: Request<{ storeId: string; orderId: string }>,
+  res: Response,
+): Promise<void> => {
+  if (!req.user) {
+    throw new AppError(
+      401,
+      "AUTHENTICATION_REQUIRED",
+      "Authentication required",
+    );
+  }
+  const storeId = Number(req.params.storeId);
+  const orderId = Number(req.params.orderId);
+  const order = await confirmOrder(storeId, orderId, req.user.id);
+
+  res.status(200).json({
     data: order,
   });
 };

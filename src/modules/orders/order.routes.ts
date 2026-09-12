@@ -22,6 +22,7 @@ import {
 
 import {
   placeOrder,
+  confirmOneOrder,
   getAllOrders,
   getOneOrder,
   cancelOneOrder,
@@ -52,6 +53,13 @@ router.post(
   requireStoreRole("MANAGER", "STAFF"),
   validateBody(createOrderSchema),
   placeOrder,
+);
+
+router.post(
+  "/:storeId/orders/:orderId/confirm",
+  validateParams(orderParamsSchema),
+  requireStoreRole("MANAGER", "STAFF"),
+  confirmOneOrder,
 );
 
 router.post(

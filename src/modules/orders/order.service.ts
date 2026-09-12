@@ -71,64 +71,19 @@ export const createOrder = async (
       products.map((product) => [product.id, product]),
     );
 
-    // 4. Lấy Inventory của store
-    const inventories = await tx.inventory.findMany({
-      where: {
-        storeId,
-        productId: {
-          in: productIds,
-        },
-      },
-      select: {
-        id: true,
-        productId: true,
-        quantity: true,
-      },
-    });
-
-    const inventoryMap = new Map(
-      inventories.map((inventory) => [inventory.productId, inventory]),
-    );
-
-    // 5. Validate Product + Inventory + Stock
-    // đồng thời snapshot price
+    // 4. Snapshot giá
     const orderItems = input.items.map((item) => {
       const product = productMap.get(item.productId);
-
       if (!product) {
         throw new AppError(404, "PRODUCT_NOT_FOUND", "Product not found", {
           productId: item.productId,
         });
       }
 
-      const inventory = inventoryMap.get(item.productId);
-
-      if (!inventory) {
-        throw new AppError(
-          404,
-          "INVENTORY_NOT_FOUND",
-          "Product is not available in this store",
-          {
-            productId: item.productId,
-          },
-        );
-      }
-
-      if (inventory.quantity < item.quantity) {
-        throw new AppError(409, "INSUFFICIENT_STOCK", "Insufficient stock", {
-          productId: item.productId,
-          available: inventory.quantity,
-          requested: item.quantity,
-        });
-      }
-
       return {
         productId: item.productId,
         quantity: item.quantity,
-
-        // Không lấy giá từ client
         unitPrice: product.price,
-
         lineTotal: product.price * item.quantity,
       };
     });
@@ -138,17 +93,19 @@ export const createOrder = async (
       0,
     );
 
-    // 6. Tạo Order + OrderItem
-    const order = await tx.order.create({
+    // 5. Tạo PENDING Order
+    return tx.order.create({
       data: {
         storeId,
+
         customerId: input.customerId ?? null,
 
         createdById: userId,
 
-        // Order này đã trừ kho nên được CONFIRMED
-        status: "CONFIRMED",
-
+        /*
+         * Không cần status: "PENDING"
+         * vì schema đã default PENDING.
+         */
         totalAmount,
 
         items: {
@@ -186,53 +143,147 @@ export const createOrder = async (
         },
       },
     });
+  });
+};
 
-    // 7. Decrease inventory
-    for (const item of input.items) {
+export const confirmOrder = async (
+  storeId: number,
+  orderId: number,
+  userId: number,
+) => {
+  return prisma.$transaction(async (tx) => {
+    // 1. Load Order
+    const order = await tx.order.findFirst({
+      where: {
+        id: orderId,
+        storeId,
+      },
+      select: {
+        id: true,
+        status: true,
+        items: {
+          select: {
+            productId: true,
+            quantity: true,
+          },
+        },
+      },
+    });
+    if (!order) {
+      throw new AppError(404, "ORDER_NOT_FOUND", "Order not found");
+    }
+
+    // 2. Business rule
+    if (order.status === "CONFIRMED") {
+      throw new AppError(
+        400,
+        "ORDER_ALREADY_CONFIRMED",
+        "Order has already been confirmed",
+      );
+    }
+    if (order.status === "CANCELLED") {
+      throw new AppError(
+        400,
+        "ORDER_CANNOT_BE_CONFIRMED",
+        "Cancelled order cannot be confirmed",
+      );
+    }
+
+    /**
+     * 3. Guard state transition
+     * Chỉ PENDING mới được CONFIRMED
+     */
+    const transition = await tx.order.updateMany({
+      where: {
+        id: orderId,
+        storeId,
+        status: "PENDING",
+      },
+      data: {
+        status: "CONFIRMED",
+      },
+    });
+    if (transition.count === 0) {
+      throw new AppError(
+        400,
+        "ORDER_STATE_CHANGED",
+        "Order state already changed",
+      );
+    }
+
+    // 4. Deduct inventory
+    for (const item of order.items) {
       const updated = await tx.inventory.updateMany({
         where: {
           storeId,
           productId: item.productId,
-
-          // Guard chống stock âm
           quantity: {
             gte: item.quantity,
           },
         },
-
         data: {
           quantity: {
             decrement: item.quantity,
           },
         },
       });
-
       if (updated.count === 0) {
-        throw new AppError(409, "INSUFFICIENT_STOCK", "Insufficient stock", {
-          productId: item.productId,
-        });
+        throw new AppError(
+          409,
+          "INSUFFICIENT_INVENTORY",
+          "Insufficient stock",
+          {
+            productId: item.productId,
+            requested: item.quantity,
+          },
+        );
       }
     }
 
-    // 8. Ghi Inventory History
+    // 5.Audit stock movement
     await tx.inventoryMovement.createMany({
-      data: input.items.map((item) => ({
+      data: order.items.map((item) => ({
         storeId,
         productId: item.productId,
-
         userId,
-
-        orderId: order.id,
-
         type: "STOCK_OUT",
-
         quantity: item.quantity,
-
-        note: `Order #${order.id}`,
+        note: `Confirmed order ${order.id}`,
       })),
     });
 
-    return order;
+    // 6. Return confirmed order
+    return tx.order.findUnique({
+      where: {
+        id: orderId,
+      },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
   });
 };
 
@@ -428,43 +479,21 @@ export const cancelOrder = async (
       );
     }
 
-    if (order.status !== "CONFIRMED") {
-      throw new AppError(
-        409,
-        "ORDER_CANNOT_BE_CANCELLED",
-        "Only confirmed orders can be cancelled",
-      );
-    }
-
-    /*
-     * 3. Atomic state transition
-     *
-     * Đây là guard chống double cancellation.
-     */
+    const previousStatus = order.status;
     const transition = await tx.order.updateMany({
       where: {
         id: orderId,
         storeId,
-
-        // Quan trọng
-        status: "CONFIRMED",
+        // status phải giống lúc vừa đọc
+        status: previousStatus,
       },
-
       data: {
         status: "CANCELLED",
-
         cancelledAt: new Date(),
-
         cancelledById: userId,
-
         cancelReason: input.reason ?? null,
       },
     });
-
-    /*
-     * Request khác có thể đã cancel Order
-     * ngay sau lúc chúng ta đọc Order.
-     */
     if (transition.count === 0) {
       throw new AppError(
         409,
@@ -473,91 +502,39 @@ export const cancelOrder = async (
       );
     }
 
-    // 4. Restore inventory
-    for (const item of order.items) {
-      await tx.inventory.upsert({
-        where: {
-          storeId_productId: {
-            storeId,
-            productId: item.productId,
-          },
-        },
-
-        create: {
-          storeId,
-          productId: item.productId,
-          quantity: item.quantity,
-        },
-
-        update: {
-          quantity: {
-            increment: item.quantity,
-          },
-        },
-      });
-    }
-
-    // 5. Audit Inventory History
-    await tx.inventoryMovement.createMany({
-      data: order.items.map((item) => ({
-        storeId,
-
-        productId: item.productId,
-
-        userId,
-
-        orderId,
-
-        type: "STOCK_IN",
-
-        quantity: item.quantity,
-
-        note: `Cancelled order #${orderId}`,
-      })),
-    });
-
-    // 6. Return updated order
-    return tx.order.findUnique({
-      where: {
-        id: orderId,
-      },
-
-      include: {
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            phone: true,
-          },
-        },
-
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-
-        cancelledBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-
-        items: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                sku: true,
-              },
+    if (previousStatus === "CONFIRMED") {
+      for (const item of order.items) {
+        await tx.inventory.upsert({
+          where: {
+            storeId_productId: {
+              storeId,
+              productId: item.productId,
             },
           },
-        },
-      },
-    });
+          create: {
+            storeId,
+            productId: item.productId,
+            quantity: item.quantity,
+          },
+          update: {
+            quantity: {
+              increment: item.quantity,
+            },
+          },
+        });
+
+        await tx.inventoryMovement.createMany({
+          data: order.items.map((item) => ({
+            storeId,
+            productId: item.productId,
+            userId,
+            orderId,
+            type: "STOCK_IN",
+            quantity: item.quantity,
+            note: `Cancelled order #${orderId}`,
+          })),
+        });
+      }
+    }
   });
 };
